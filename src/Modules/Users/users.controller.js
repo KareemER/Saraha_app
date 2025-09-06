@@ -1,0 +1,14 @@
+import { Router } from "express";
+import * as usersServices from "./users.service.js"
+import { authenticationMiddleware } from "../../Middlewares/authentication.middleware.js";
+
+const usersContoller = Router();
+
+usersContoller.post('/signup',usersServices.userSignup)
+usersContoller.post('/login', usersServices.userLogin)
+usersContoller.patch('/update',authenticationMiddleware,usersServices.updateUser)
+usersContoller.delete('/deleteUser',authenticationMiddleware,usersServices.deleteUser)
+usersContoller.get('/userData',authenticationMiddleware,usersServices.getUserData)
+usersContoller.put('/confirmation',usersServices.confirmationEmailService)
+usersContoller.post('/refreshToken',usersServices.refreshTokenService)
+export default usersContoller;
