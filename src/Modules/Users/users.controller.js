@@ -11,4 +11,5 @@ usersContoller.delete('/deleteUser',authenticationMiddleware,usersServices.delet
 usersContoller.get('/userData',authenticationMiddleware,usersServices.getUserData)
 usersContoller.put('/confirmation',usersServices.confirmationEmailService)
 usersContoller.post('/refreshToken',usersServices.refreshTokenService)
+usersContoller.post('/forgetPassword',usersServices.forgetPassword)
 export default usersContoller;

@@ -41,19 +41,19 @@ export const userSignup = async (req, res) => {
 }
 
 export const confirmationEmailService = async (req, res) => {
-    const {email , otp} = req.body;
-    const user = await User.findOne({email, isConfirmed:false})
-    if(!user){
-        return res.status(404).json({message:"User not found"})
+    const { email, otp } = req.body;
+    const user = await User.findOne({ email, isConfirmed: false })
+    if (!user) {
+        return res.status(404).json({ message: "User not found" })
     }
     const isOtpMatched = compareSync(otp, user.otps?.confirmation)
-    if(!isOtpMatched){
-        return res.status(401).json({message:"Invalid OTP"})
+    if (!isOtpMatched) {
+        return res.status(401).json({ message: "Invalid OTP" })
     }
     user.isConfirmed = true;
     user.otps.confirmation = null;
     await user.save();
-    return res.status(200).json({message:"User confirmed successfully"})
+    return res.status(200).json({ message: "User confirmed successfully" })
 }
 
 export const userLogin = async (req, res) => {
@@ -72,17 +72,17 @@ export const userLogin = async (req, res) => {
             return res.status(401).json({ message: "Invalid login credentials " })
         }
         const accesstoken = generatedToken(
-            { id: user._id , email:user.email},
+            { id: user._id, email: user.email },
             process.env.JWT_ACCESS_SECERET_KEY,
             { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN }
         )
         const refreshtoken = generatedToken(
-            { id: user._id , email:user.email},
+            { id: user._id, email: user.email },
             process.env.JWT_REFRESH_SECERET_KEY,
             { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN }
 
         )
-        return res.status(200).json({ message: "User logged in successfully", accesstoken , refreshtoken })
+        return res.status(200).json({ message: "User logged in successfully", accesstoken, refreshtoken })
     } catch (error) {
         console.log(error);
         return res.status(500).json({ message: error })
@@ -138,16 +138,60 @@ export const getUserData = async (req, res) => {
     }
 }
 
-export const refreshTokenService = async (req,res) => {
-    const {refreshtoken} = req.headers
+export const refreshTokenService = async (req, res) => {
+    const { refreshtoken } = req.headers
     const decodedData = verifyToken(refreshtoken, process.env.JWT_REFRESH_SECERET_KEY)
-    if(!decodedData){
-        return res.status(401).json({message:"Invalid refresh token"})
+    if (!decodedData) {
+        return res.status(401).json({ message: "Invalid refresh token" })
     }
     const accesstoken = generatedToken(
-        { id: decodedData._id , email:decodedData.email},
+        { id: decodedData._id, email: decodedData.email },
         process.env.JWT_ACCESS_SECERET_KEY,
         { expiresIn: process.env.JWT_ACCESS_EXPIRES_IN }
     )
-    return res.status(200).json({message:"Token refreshed successfully", accesstoken})
+    return res.status(200).json({ message: "Token refreshed successfully", accesstoken })
+}
+
+export const forgetPassword = async (req, res) => {
+
+    const email = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: "User not found" })
+    const otp = confirmationCode();
+    user.otps.resetPassword = hashSync(otp, +process.env.SALT_ROUNDS);
+    await user.save();
+    emitter.emit('sendEmail', {
+        to: email,
+        subject: "reset password email",
+        content: `<h1>Thank you for signing up to our app</h1>
+        <p>Your reset password OTP is ${otp}</p>
+        <a href="https://freecatphotoapp.com">Confirm</a>`
+    })
+    return res.status(200).json({ message: "reset password OTP is sent to your email" })
+}
+
+export const resetPassword = async (req, res) => {
+    const { email, otp, newPassword } = req.body;
+    if (oldPassword === newPassword) return res.status(400).json({ message: "New password cannot be the same as old password" })
+    const user = await User.findOne({ email })
+    if (!user) return res.status(404).json({ message: "User not found" })
+    const isOtpMatched = compareSync(otp, user.otps?.resetPassword)
+    if (!isOtpMatched) return res.status(401).json({ message: "Invalid OTP" })
+    user.password = hashSync(newPassword, +process.env.SALT_ROUNDS)
+    user.otps.resetPassword = null
+    await user.save()
+    return res.status(200).json({ message: "Password reset successfully" })
+}
+
+export const updatePassword = async (req, res) => {
+    const { _id: userId } = req.loggedInUser;
+    const { oldPassword, newPassword } = req.body;
+    const user = await User.findById(userId)
+    if (oldPassword === newPassword) return res.status(400).json({ message: "New password cannot be the same as old password" })
+    if (!user) return res.status(404).json({ message: "User not found" })
+    const isPasswordMatched = compareSync(oldPassword, user.password)
+    if (!isPasswordMatched) return res.status(401).json({ message: "Invalid password" })
+    user.password = hashSync(newPassword, +process.env.SALT_ROUNDS)
+    await user.save()
+    return res.status(200).json({ message: "Password updated successfully" })
 }
