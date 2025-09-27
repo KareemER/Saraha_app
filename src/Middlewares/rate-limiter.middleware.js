@@ -1,6 +1,6 @@
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import MongoStore from 'rate-limit-mongo';
-import { getCountryCode } from "../Utils/countries.utils";
+import { getCountryCode } from "../Utils/countries.utils.js";
 
 export const limiter = rateLimit({
   windowMs: 5 * 60 * 1000,
