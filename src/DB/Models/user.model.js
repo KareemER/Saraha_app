@@ -49,8 +49,11 @@ const userSchema = new Schema({
     default: "rather not say"
   },
   otps: {
-    confirmation: { type: String },
-    resetPassword: { type: String }
+    confirmation: String,
+    resetPassword: {
+      code: String,
+      expiresAt: Date
+    },
   },
   isConfirmed: {
     type: Boolean,
@@ -58,12 +61,20 @@ const userSchema = new Schema({
   },
   role: {
     type: String,
-    emum: Object.values(RolesEnum)
+    emum: Object.values(RolesEnum),
+    default: RolesEnum.USER
   },
   provider: {
     type: String,
-    enum: Object.values(ProviderEnum)
-  }
+    enum: Object.values(ProviderEnum),
+    default: ProviderEnum.LOCAL
+  },
+  googleSub: String,
+  profilePicture: {
+    secure_url: String,
+    public_id: String
+  },
+  devices: [String]
 },
   {
     timestamps: true,
@@ -81,6 +92,12 @@ const userSchema = new Schema({
       }
     }
   });
+
+userSchema.virtual("Messages", {
+  ref: "Messages",
+  localField: "_id",
+  foreignField: "receiverId"
+})
 
 const User = mongoose.model('User', userSchema)
 export default User

@@ -9,6 +9,10 @@ const messageSchema = new Schema({
   receiverId:{
     type:Schema.Types.ObjectId, ref:'User',
     require:true
+  },
+  isPublic: {
+    type: Boolean,
+    default: false,
   }
 },
 {

@@ -15,7 +15,7 @@ export const SignUpSchema = {
         password :generalRules.password.required(),
         confirmPassword : Joi.string().valid(Joi.ref('password')),
         gender : Joi.string().valid(...Object.values(GenderEnum)).optional(),
-        phoneNumber : Joi.string(),
+        phone : Joi.string(),
         age : Joi.number().integer().positive().greater(18).less(60),
         role : Joi.string().valid(...Object.values(RolesEnum))
     })
