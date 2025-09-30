@@ -1,5 +1,5 @@
 import multer from "multer"
-import { allowedFileExtensions, fileTypes } from "../Common/constants/files.constants.js"
+import { allowedFileExtensions, fileTypes } from "../Common/file-extenseion.constants.js"
 
 
 export const hostUpload = ()=>{

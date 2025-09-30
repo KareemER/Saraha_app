@@ -1,10 +1,18 @@
 import { compareSync, hashSync } from "bcrypt";
 import User from "../../DB/Models/user.model.js"
+import RevokedToken from "../../DB/Models/revoked-tokens.model.js";
+import { OAuth2Client } from "google-auth-library";
+import { v4 as uuidv4 } from "uuid";
 import { decrypt, encrypt } from "../../Utils/Encryption.utils.js";
 import { generatedToken, verifyToken } from "../../Utils/Token.utils.js";
-import { emitter } from "../../Utils/send-email.utils.js";
+import { emitter } from "../../Utils/send-email.utils.js"; 
 import { customAlphabet } from "nanoid";
+import { UploadFileOnCloudinary } from "../../Common/cloudinary.service.js";
+import { ProviderEnum } from "../../Common/user.enum.js";
+
+
 const confirmationCode = customAlphabet('qwertyuioasdfghjkxcvbnm78416', 6);
+
 
 export const userSignup = async (req, res) => {
     try {
@@ -199,4 +207,95 @@ export const updatePassword = async (req, res) => {
 export const getAllUsers = async (req, res) => {
     const users = await User.find();
     return res.status(200).json({ message: "Users retrieved successfully", users })
+}
+
+export const LogoutService = async (req, res) => {
+
+    const { token: { tokenId, expirationDate }, user: { _id } } = req.loggedInUser
+
+    await RevokedToken.create({
+        tokenId,
+        expirationDate: new Date(expirationDate * 1000),
+        userId: _id
+    })
+
+    return res.status(200).json({ message: "User Logged out successfully" })
+}
+
+export const AuthServiceWithGmail = async (req, res) => {
+
+    const { idToken } = req.body;
+    const client = new OAuth2Client();
+    const userToken = await client.verifyToken({
+        idToken,
+        audience: process.env.WEB_CLIENT_ID
+    });
+
+    const { email, given_name, family_name, email_verified, sub } = userToken.getPayload()
+    if (!email_verified) return res.status(400).json({ message: "Email is not verified" })
+
+    // find user with email and provider from out database
+    const isUserExist = await User.findOne({ googleSub: sub, provider: ProviderEnum.GOOGLE });
+    let newUser;
+    if (!isUserExist) {
+        newUser = await User.create({
+            firstName: given_name,
+            lastName: family_name || ' ',
+            email,
+            provider: ProviderEnum.GOOGLE,
+            isConfirmed: true,
+            password: hashSync(uniqueString(), +process.env.SALT_ROUNDS),
+            googleSub: sub
+        })
+    } else {
+        newUser = isUserExist
+        isUserExist.email = email
+        isUserExist.firstName = given_name
+        isUserExist.lastName = family_name || ' '
+        await isUserExist.save()
+    }
+    // Generate token for the loggedIn User
+    const accesstoken = generateToken(
+        { _id: newUser._id, email: newUser.email },
+        process.env.JWT_ACCESS_SECRET,
+        {
+            expiresIn: process.env.JWT_ACCESS_EXPIRES_IN,
+            jwtid: uuidv4()
+        }
+    );
+
+    // Refresh token
+    const refreshtoken = generateToken(
+        { _id: newUser._id, email: newUser.email },
+        process.env.JWT_REFRESH_SECRET,
+        {
+
+            expiresIn: process.env.JWT_REFRESH_EXPIRES_IN,
+            jwtid: uuidv4()
+        }
+    )
+    res.status(200).json({ message: "User signed up successfully", tokens: { accesstoken, refreshtoken } })
+}
+
+export const UploadProfileService = async (req, res) => {
+
+    const { _id } = req.loggedInUser
+    const { path } = req.file
+
+    const { secure_url, public_id } = await UploadFileOnCloudinary(
+        path,
+        {
+            folder: 'Saraha_App/Users/ProfilePictures',
+            resource_type: 'image'
+        }
+    )
+
+    const user = await User.findByIdAndUpdate(_id, {
+        profilePicture: {
+            secure_url,
+            public_id
+        }
+    }, { new: true })
+
+    return res.status(200).json({ message: "profile uploaded successfully", user })
 }
